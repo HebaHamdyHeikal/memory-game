@@ -3,68 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Game</title>
+  <title>Memory Game - Kid Friendly</title>
   <style>
-    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; margin: 0; padding: 0; }
-
-    #game-board {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-      gap: 10px;
-      margin-top: 20px;
-      perspective: 1000px;
-      width: 90vw;
-      max-width: 600px;
-    }
-
-    .card {
-      width: 100%;
-      padding-top: 100%; /* keeps card square */
-      position: relative;
-      cursor: pointer;
-      transform-style: preserve-3d;
-      transition: transform 0.6s;
-    }
-
-    .card-inner {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-      transform-style: preserve-3d;
-      transition: transform 0.6s;
-    }
-
-    .card.flipped .card-inner { transform: rotateY(180deg); }
-
-    .card-front, .card-back {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      backface-visibility: hidden;
-      border-radius: 10px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 2rem;
-    }
-
-    .card-front { background: #3498db; color: white; }
-    .card-back { background: #2ecc71; transform: rotateY(180deg); }
-    .card-back img { width: 100%; height: 100%; object-fit: contain; }
-
-    #timer { font-size: 1.5rem; margin-top: 10px; }
-    #score { font-size: 1.2rem; margin-top: 10px; }
-    #resetBtn { margin-top: 10px; padding: 10px 20px; font-size: 1rem; border-radius: 10px; cursor: pointer; }
+    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; background: #f0f8ff; }
+    h1 { color: #ff6f61; }
+    #instructions { font-size: 1.2rem; color: #333; margin-bottom: 10px; }
+    #game-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; margin-top: 20px; perspective: 1000px; width: 90vw; max-width: 600px; }
+    .card { width: 100%; padding-top: 100%; position: relative; cursor: pointer; transform-style: preserve-3d; transition: transform 0.6s; }
+    .card-inner { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.6s; }
+    .card.flipped .card-inner { transform: rotateY(180deg) scale(1.05); transition: transform 0.5s cubic-bezier(.68,-0.55,.27,1.55); }
+    .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 15px; display: flex; justify-content: center; align-items: center; font-size: 2rem; }
+    .card-front { background: #ffcc00; color: white; }
+    .card-back { background: #4caf50; transform: rotateY(180deg); }
+    .card-back img { width: 100%; height: 100%; object-fit: contain; border-radius: 15px; }
+    #timer, #score { font-size: 1.5rem; margin-top: 10px; color: #333; }
+    #resetBtn { margin-top: 10px; padding: 10px 20px; font-size: 1rem; border-radius: 10px; cursor: pointer; background: #ff6f61; color: white; border: none; }
     #winMessage { font-size: 2rem; color: green; margin-top: 15px; display: none; position: relative; z-index: 1000; }
-
-    @media (max-width: 400px) {
-      #game-board { gap: 5px; }
-    }
+    .star { position: absolute; width: 30px; height: 30px; background: gold; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); animation: pop 0.8s forwards; z-index: 10; }
+    @keyframes pop { 0% {transform: scale(0);} 50% {transform: scale(1.2);} 100% {transform: scale(1);} }
+    @media (max-width: 400px) { #game-board { gap: 5px; } }
   </style>
 </head>
 <body>
   <h1>Memory Game</h1>
+  <div id="instructions">Find all matching cards!</div>
   <div id="timer">Time: 0s</div>
   <div id="score">Score: 0/8</div>
   <button id="resetBtn">Reset</button>
@@ -75,134 +37,79 @@
 
   <script>
     const cards = ['1','1b','2','2b','3','3b','4','4b','5','5b','6','6b','7','7b','8','8b'];
-    let activeCards = [];
-    let lock = false;
-    let time = 0;
-    let score = 0;
-    let timerInterval;
-    let timerStarted = false;
+    const matchSound = new Audio('sounds/match.mp3');
+    const wrongSound = new Audio('sounds/wrong.mp3');
 
-    function shuffle(array){
-      for (let i = array.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-      return array;
-    }
+    let activeCards = [], lock = false, time = 0, score = 0, timerInterval, timerStarted = false;
 
-    function startTimer(){
-      timerInterval = setInterval(() => {
-        time++;
-        document.getElementById('timer').innerText = 'Time: ' + time + 's';
-      }, 1000);
-    }
+    function shuffle(array){ for(let i=array.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1)); [array[i],array[j]]=[array[j],array[i]];} return array; }
+
+    function startTimer(){ timerInterval=setInterval(()=>{time++; document.getElementById('timer').innerText='Time: '+time+'s';},1000); }
 
     function createBoard(){
       const board = document.getElementById("game-board");
-      shuffle(cards).forEach(num => {
-        const card = document.createElement("div");
-        card.classList.add("card");
-
-        const inner = document.createElement('div');
-        inner.classList.add('card-inner');
-
-        const front = document.createElement('div');
-        front.classList.add('card-front');
-
-        const back = document.createElement('div');
-        back.classList.add('card-back');
-        const img = document.createElement('img');
-        img.src = `images/${num}.png`;
-        back.appendChild(img);
-
-        inner.appendChild(front);
-        inner.appendChild(back);
-        card.appendChild(inner);
-
-        card.dataset.value = num;
+      shuffle(cards).forEach(num=>{
+        const card=document.createElement("div"); card.classList.add("card");
+        const inner=document.createElement("div"); inner.classList.add("card-inner");
+        const front=document.createElement("div"); front.classList.add("card-front");
+        const back=document.createElement("div"); back.classList.add("card-back");
+        const img=document.createElement("img"); img.src=`images/${num}.png`; back.appendChild(img);
+        inner.appendChild(front); inner.appendChild(back); card.appendChild(inner);
+        card.dataset.value=num;
         card.addEventListener('click', flipCard);
         board.appendChild(card);
       });
     }
 
-    function flipCard() {
+    function flipCard(){
       if(lock || this.classList.contains('flipped') || this.style.visibility==='hidden') return;
-
-      if(!timerStarted){
-        startTimer();
-        timerStarted = true;
-      }
-
+      if(!timerStarted){ startTimer(); timerStarted=true; }
       if(activeCards.includes(this)) return;
 
       this.classList.add('flipped');
       activeCards.push(this);
 
-      if(activeCards.length === 2){
-        lock = true;
-        const [cardA, cardB] = activeCards;
-        const baseA = cardA.dataset.value.replace('b','');
-        const baseB = cardB.dataset.value.replace('b','');
+      if(activeCards.length===2){
+        lock=true;
+        const [cardA, cardB]=activeCards;
+        const baseA=cardA.dataset.value.replace('b','');
+        const baseB=cardB.dataset.value.replace('b','');
 
-        if(baseA === baseB){
+        if(baseA===baseB){
+          matchSound.play();
           setTimeout(()=>{
-            cardA.style.opacity='0';
-            cardB.style.opacity='0';
-            setTimeout(()=>{
-              cardA.style.visibility='hidden';
-              cardB.style.visibility='hidden';
-            },400);
-
-            score++;
-            document.getElementById('score').innerText = `Score: ${score}/8`;
-
-            if(score === 8){
-              clearInterval(timerInterval);
-              document.getElementById('winMessage').style.display='block';
-              startConfetti();
-            }
-
-            activeCards = [];
-            lock = false;
+            createStar(cardA); createStar(cardB);
+            cardA.style.opacity='0'; cardB.style.opacity='0';
+            setTimeout(()=>{ cardA.style.visibility='hidden'; cardB.style.visibility='hidden'; },400);
+            score++; document.getElementById('score').innerText=`Score: ${score}/8`;
+            if(score===8){ clearInterval(timerInterval); document.getElementById('winMessage').style.display='block'; startConfetti(); }
+            activeCards=[]; lock=false;
           },300);
         } else {
-          setTimeout(()=>{
-            cardA.classList.remove('flipped');
-            cardB.classList.remove('flipped');
-            activeCards = [];
-            lock = false;
-          },1000);
+          wrongSound.play();
+          setTimeout(()=>{ cardA.classList.remove('flipped'); cardB.classList.remove('flipped'); activeCards=[]; lock=false; },1000);
         }
       }
     }
 
+    function createStar(card){
+      const star=document.createElement('div'); star.classList.add('star');
+      const rect=card.getBoundingClientRect();
+      star.style.left=(rect.left+rect.width/2-15)+'px';
+      star.style.top=(rect.top-30)+'px';
+      document.body.appendChild(star);
+      setTimeout(()=>{ star.remove(); },800);
+    }
+
     createBoard();
-    document.getElementById('resetBtn').addEventListener('click', ()=> { location.reload(); });
+    document.getElementById('resetBtn').addEventListener('click', ()=>{ location.reload(); });
 
     function startConfetti(){
-      const canvas = document.getElementById('confettiCanvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      const pieces = [];
-      for(let i=0;i<150;i++) pieces.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*6+4,d:Math.random()*canvas.height,color:`hsl(${Math.random()*360},100%,50%)`});
-      let angle=0;
-      function draw(){
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        pieces.forEach(p=>{
-          ctx.beginPath();
-          ctx.fillStyle=p.color;
-          ctx.arc(p.x,p.y,p.r,0,Math.PI*2,false);
-          ctx.fill();
-          p.y+=Math.cos(angle+p.d)*2+2;
-          p.x+=Math.sin(angle)*2;
-          if(p.y>canvas.height)p.y=0,p.x=Math.random()*canvas.width;
-          if(p.x>canvas.width)p.x=0;
-        });
-        angle+=0.01;
-        requestAnimationFrame(draw);
-      }
-      draw();
+      const canvas=document.getElementById('confettiCanvas');
+      const ctx=canvas.getContext('2d');
+      canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+      const pieces=[]; for(let i=0;i<150;i++) pieces.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*6+4,d:Math.random()*canvas.height,color:`hsl(${Math.random()*360},100%,50%)`});
+      let angle=0; function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height); pieces.forEach(p=>{ ctx.beginPath(); ctx.fillStyle=p.color; ctx.arc(p.x,p.y,p.r,0,Math.PI*2,false); ctx.fill(); p.y+=Math.cos(angle+p.d)*2+2; p.x+=Math.sin(angle)*2; if(p.y>canvas.height)p.y=0,p.x=Math.random()*canvas.width; if(p.x>canvas.width)p.x=0;}); angle+=0.01; requestAnimationFrame(draw); } draw();
     }
   </script>
 </body>
